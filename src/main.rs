@@ -51,19 +51,19 @@ mod java_stuff {
     const OP_INVOKE_SPECIAL: u8 = 0xb7; // 183
 
     const ACC_FLAGS_MASKS: [u16; 13] = [
-        0b00000000_0000_0001, // ACC_PUBLIC     = 0x0001 
-        0b00000000_0000_0010, // ACC_PRIVATE    = 0x0002 
-        0b00000000_0000_0100, // ACC_PROTECTED  = 0x0004
-        0b00000000_0000_1000, // ACC_STATIC     = 0x0008 
-        0b00000000_0001_0000, // ACC_FINAL      = 0x0010 
-        0b00000000_0010_0000, // ACC_SUPER      = 0x0020
-        0b00000000_0100_0000, // ACC_VOLATILE   = 0x0040 
-        0b00000000_1000_0000, // ACC_TRANSIENT  = 0x0080 
-        0b0000_0010_00000000, // ACC_INTERFACE  = 0x0200
-        0b0000_0100_00000000, // ACC_ABSTRACT   = 0x0400
-        0b0001_0000_00000000, // ACC_SYNTHETIC  = 0x1000
-        0b0010_0000_00000000, // ACC_ANNOTATION = 0x2000
-        0b0100_0000_00000000  // ACC_ENUM       = 0x4000
+        0b0000_0000_0000_0001, // ACC_PUBLIC     = 0x0001 
+        0b0000_0000_0000_0010, // ACC_PRIVATE    = 0x0002 
+        0b0000_0000_0000_0100, // ACC_PROTECTED  = 0x0004
+        0b0000_0000_0000_1000, // ACC_STATIC     = 0x0008 
+        0b0000_0000_0001_0000, // ACC_FINAL      = 0x0010 
+        0b0000_0000_0010_0000, // ACC_SUPER      = 0x0020
+        0b0000_0000_0100_0000, // ACC_VOLATILE   = 0x0040 
+        0b0000_0000_1000_0000, // ACC_TRANSIENT  = 0x0080 
+        0b0000_0010_0000_0000, // ACC_INTERFACE  = 0x0200
+        0b0000_0100_0000_0000, // ACC_ABSTRACT   = 0x0400
+        0b0001_0000_0000_0000, // ACC_SYNTHETIC  = 0x1000
+        0b0010_0000_0000_0000, // ACC_ANNOTATION = 0x2000
+        0b0100_0000_0000_0000  // ACC_ENUM       = 0x4000
     ];
 
     const ACC_FLAGS: [&str; 13] = [
@@ -280,13 +280,13 @@ mod java_stuff {
                 member.get_flags().join(" ") + " " + 
                 &mem_type + " " + 
                 &self.get_utf8(member.name_index) + &params
-            ).trim().replace("/", ".").to_string()
+            ).trim().replace('/', ".").to_string()
         }
         pub fn get_member_desc(&self, member: &Member) -> String {
             self.get_utf8(member.desc_index)
-                .replace("L", "")
-                .replace("/", ".")
-                .replace(";", ",")
+                .replace('L', "")
+                .replace('/', ".")
+                .replace(';', ",")
                 .trim_matches(
                     |c: char| 
                     c.is_whitespace() ||
@@ -564,7 +564,7 @@ mod java_stuff {
                         info: AttrInfo::LineNumberTable { 
                             line_number_len: {
                                 ln_num_len = parse_u2(bytes, cursor).unwrap();
-                                ln_num_len.clone()
+                                ln_num_len
                             }, 
                             line_number_tbl: {
                                 //TODO: fill out line number table later
@@ -589,16 +589,16 @@ mod java_stuff {
                             max_locals: parse_u2(bytes, cursor).unwrap(), 
                             code_len: {
                                 code_length = parse_u4(bytes, cursor).unwrap();
-                                code_length.clone()
+                                code_length
                             }, 
                             code: {
-                                let code_slice = bytes[*cursor as usize..((*cursor+code_length) as u32) as usize].to_vec();
+                                let code_slice = bytes[*cursor as usize..(*cursor+code_length) as usize].to_vec();
                                 *cursor += code_length;
                                 code_slice
                             }, 
                             exception_table_len: {
                                 exc_tbl_len = parse_u2(bytes, cursor).unwrap();
-                                exc_tbl_len.clone()
+                                exc_tbl_len
                             }, 
                             exception_table: {
                                 bytes[*cursor as usize..(*cursor+(exc_tbl_len*8) as u32) as usize]
@@ -612,7 +612,7 @@ mod java_stuff {
                             }, 
                             attr_count: {
                                 code_attr_len = parse_u2(bytes, cursor).unwrap();
-                                code_attr_len.clone()
+                                code_attr_len
                             }, 
                             attributes: parse_attributes(bytes, cursor, code_attr_len, constants)
                         }
@@ -662,7 +662,7 @@ mod java_stuff {
                     }
                     if is_params { 
                         params.push_str(&str_buffer);
-                        params.push_str(String::from(" arg".to_owned()+&arg_num.to_string()).as_str());
+                        params.push_str((" arg".to_owned() + &arg_num.to_string()).as_str());
                         params.push_str(", ");
                         arg_num += 1
                     } else {
@@ -684,7 +684,7 @@ mod java_stuff {
                     }
                     if is_params {
                         params.push_str(&str_buffer);
-                        params.push_str(String::from(" arg".to_owned()+&arg_num.to_string()).as_str());
+                        params.push_str((" arg".to_owned() + &arg_num.to_string()).as_str());
                         params.push_str(", ");
                         arg_num += 1
                     } else {
@@ -723,7 +723,7 @@ mod java_stuff {
     fn parse_constants(bytes: &Vec<u8>, cursor: &mut u32, const_pool_count: u16) -> Vec<CpInfo> {
         (0..const_pool_count-1).map(|_| {
             let tag = parse_u1(bytes, cursor).unwrap();
-            parse_constant(&bytes, cursor, tag)
+            parse_constant(bytes, cursor, tag)
         }).collect()
     }
 
@@ -731,7 +731,7 @@ mod java_stuff {
         (0..attr_count)
             .map(|_| {
                 let name_index = parse_u2(bytes, cursor).unwrap();
-                parse_attribute(bytes, cursor, name_index, &const_pool).expect("None attribute")
+                parse_attribute(bytes, cursor, name_index, const_pool).expect("None attribute")
             }).collect()
     }
 
@@ -743,7 +743,7 @@ mod java_stuff {
                     access_flags: parse_u2(bytes, cursor).unwrap(),
                     name_index: parse_u2(bytes, cursor).unwrap(),
                     desc_index: parse_u2(bytes, cursor).unwrap(),
-                    attr_count: {attr_count = parse_u2(bytes, cursor).unwrap(); attr_count.clone()},
+                    attr_count: {attr_count = parse_u2(bytes, cursor).unwrap(); attr_count},
                     attributes: parse_attributes(bytes, cursor, attr_count, const_pool)
                 }
             }).collect()
@@ -771,7 +771,7 @@ mod java_stuff {
     }
 
     fn get_constant(index: u16, constants: &Vec<CpInfo>) -> Option<CpInfo> {
-        constants.get((index-1) as usize).map(|constant| constant.clone())
+        constants.get((index-1) as usize).cloned()
     }
 
     pub fn get_classname(index: usize, constants: &Vec<CpInfo>) -> String {
@@ -797,19 +797,19 @@ mod java_stuff {
             magic: parse_magic(&bytes, &mut cursor),
             minor_version: parse_u2(&bytes, &mut cursor).unwrap(),
             major_version: parse_u2(&bytes, &mut cursor).unwrap(),
-            const_pool_count: {const_pool_count = parse_u2(&bytes, &mut cursor).unwrap(); const_pool_count.clone()},
+            const_pool_count: {const_pool_count = parse_u2(&bytes, &mut cursor).unwrap(); const_pool_count},
             const_pool: {const_pool = parse_constants(&bytes, &mut cursor, const_pool_count); const_pool.clone()},
             access_flags: parse_u2(&bytes, &mut cursor).unwrap(),
             this_class: parse_u2(&bytes, &mut cursor).unwrap(),
             super_class: parse_u2(&bytes, &mut cursor).unwrap(),
-            interfaces_count: {interfaces_count = parse_u2(&bytes, &mut cursor).unwrap(); interfaces_count.clone()},
-            interfaces: {(0..=interfaces_count.checked_sub(1).unwrap_or(0))
+            interfaces_count: {interfaces_count = parse_u2(&bytes, &mut cursor).unwrap(); interfaces_count},
+            interfaces: {(0..=interfaces_count.saturating_sub(1))
                             .map(|_| parse_u2(&bytes, &mut cursor).unwrap()).collect()},
-            fields_count: {fields_count = parse_u2(&bytes, &mut cursor).unwrap(); fields_count.clone()},
+            fields_count: {fields_count = parse_u2(&bytes, &mut cursor).unwrap(); fields_count},
             fields: parse_members(&bytes, &mut cursor, fields_count, &const_pool),
-            methods_count: {methods_count = parse_u2(&bytes, &mut cursor).unwrap(); methods_count.clone()},
+            methods_count: {methods_count = parse_u2(&bytes, &mut cursor).unwrap(); methods_count},
             methods: parse_members(&bytes, &mut cursor, methods_count, &const_pool),
-            attr_count: {attr_count = parse_u2(&bytes, &mut cursor).unwrap(); attr_count.clone()},
+            attr_count: {attr_count = parse_u2(&bytes, &mut cursor).unwrap(); attr_count},
             attributes: parse_attributes(&bytes, &mut cursor, attr_count, &const_pool)
         }
 
@@ -824,9 +824,9 @@ fn main() {
 
     print!("\n\n{} {} ", hello_class.get_flags().join(" "), hello_class.get_classname());
     println!("extends {} implements {} {{", 
-        hello_class.get_super_classname().replace("/","."),
+        hello_class.get_super_classname().replace('/',"."),
         hello_class.get_interfaces().join(", ")
-            .replace("/",".").trim_end_matches(", ")
+            .replace('/',".").trim_end_matches(", ")
     );
     hello_class.get_fields_full().iter().for_each(|str| println!("\t{}", str));
     println!();
