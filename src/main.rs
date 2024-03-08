@@ -172,7 +172,6 @@ mod java_stuff {
     // }
 
     #[derive(Debug, Clone)]
-    #[allow(clippy::unused_variables)]
     enum AttrInfo { // allowed to ignore some Attributes i think?
         ConstantValue { constvalue_index: u16 },
         Code {
@@ -329,9 +328,11 @@ mod java_stuff {
     }
     
     fn decompile_code_bytes(bytes: &Vec<u8>) -> Vec<String> {
-        let mut i: u32 = 0;
+        //let mut i: u32 = 0;
+        let mut i: usize = 0;
         let mut code: Vec<String> = vec![];
-        while i < bytes.len() as u32 {
+        //while i < bytes.len() as u32 {
+        while i < bytes.len() {
             let opcode = bytes[i as usize];
             match opcode {
                 OP_NOP => code.push("nop".to_string()),
@@ -342,26 +343,26 @@ mod java_stuff {
                 OP_FCONST_0..=OP_FCONST_2 => code.push("fconst_".to_string() + &(opcode-0xb).to_string()),
                 OP_DCONST_0 | OP_DCONST_1 => code.push("dconst_".to_string() + &(opcode-0xe).to_string()),
                 OP_BIPUSH => { 
-                    code.push("bipush ".to_string() + &bytes[i as usize+1].to_string());
+                    code.push("bipush ".to_string() + &bytes[i+1].to_string());
                     i+=1
                 },
                 OP_LDC => {
-                    code.push("ldc #".to_string() + &bytes[i as usize+1].to_string());
+                    code.push("ldc #".to_string() + &bytes[i+1].to_string());
                     i+=1
                 },
                 OP_LDC_W => {
-                    code.push("ldc_w #".to_string() + &((bytes[i as usize+1] as u16) << 8 | (bytes[i as usize+2] as u16)).to_string());
+                    code.push("ldc_w #".to_string() + &(parse_u2_be(&bytes[i+1..i+3])).to_string());
                     i+=2
                 }
                 OP_ALOAD_0..=OP_ALOAD_3 => code.push("aload_".to_string()+&(opcode-42).to_string()),
                 OP_ARETURN => code.push("areturn".to_string()),
                 OP_RETURN => code.push("return".to_string()),
                 OP_GETSTATIC => { 
-                    code.push("getstatic #".to_string() + &((bytes[i as usize+1] as u16) << 8 | (bytes[i as usize+2] as u16)).to_string());
+                    code.push("getstatic #".to_string() + &(parse_u2_be(&bytes[i+1..i+3])).to_string());
                     i+=2
                 },
                 OP_PUTFIELD => {
-                    code.push("putfield #".to_string() + &((bytes[i as usize+1] as u16) << 8 | (bytes[i as usize+2] as u16)).to_string());
+                    code.push("putfield #".to_string() + &(parse_u2_be(&bytes[i+1..i+3])).to_string());
                     i+=2
                 },
                 OP_INVOKE_VIRTUAL => {
@@ -389,16 +390,22 @@ mod java_stuff {
         Some(bytes[(*cursor - 1) as usize])
     }
 
-    fn parse_u2(bytes: &Vec<u8>, cursor: &mut u32) -> Option<u16> {
+    fn parse_u2_be(bytes: &[u8]) -> u16 {
+        if bytes.len() != 2 {
+            panic!("incorrect number of bytes");
+        }
+        (bytes[0] as u16) << 8 | (bytes[1] as u16)
+    }
+
+    fn parse_u2(bytes: &Vec<u8>, cursor: &mut u32) -> u16 {
         if *cursor >= (bytes.len()-1) as u32 {
-            return None;
+            panic!("Not enough bytes to parse u2\ncursor = {}", *cursor);
         }
 
         *cursor += 2;
-        Some(
-            u16::from(bytes[(*cursor - 1) as usize]) | 
-            u16::from(bytes[(*cursor - 2) as usize]).wrapping_shl(8)
-        )
+        
+        u16::from(bytes[(*cursor - 1) as usize]) | 
+        u16::from(bytes[(*cursor - 2) as usize]).wrapping_shl(8)
     }
 
     fn parse_u4(bytes: &Vec<u8>, cursor: &mut u32) -> Option<u32> {
@@ -453,7 +460,7 @@ mod java_stuff {
     fn parse_constant(bytes: &Vec<u8>, cursor: &mut u32, tag: u8) -> CpInfo {
         match tag {
             CONSTANT_UTF8 => {
-                let length = parse_u2(bytes, cursor).unwrap();
+                let length = parse_u2(bytes, cursor);
                 let string: String = String::from_utf8(bytes[*cursor as usize..(*cursor+length as u32) as usize].to_vec()).unwrap();
                 *cursor += length as u32;
                 
@@ -489,7 +496,7 @@ mod java_stuff {
                 CpInfo {
                     tag,
                     info: ConstInfo::Class { 
-                        name_index: parse_u2(bytes, cursor).unwrap()
+                        name_index: parse_u2(bytes, cursor)
                     }
                 }
             }
@@ -498,7 +505,7 @@ mod java_stuff {
                 CpInfo {
                     tag,
                     info: ConstInfo::String { 
-                        string_index: parse_u2(bytes, cursor).unwrap()
+                        string_index: parse_u2(bytes, cursor)
                     }
                 }
             }
@@ -507,8 +514,8 @@ mod java_stuff {
                 CpInfo {
                     tag,
                     info: ConstInfo::Member { 
-                        class_index: parse_u2(bytes, cursor).unwrap(), 
-                        name_and_type_index: parse_u2(bytes, cursor).unwrap() 
+                        class_index: parse_u2(bytes, cursor), 
+                        name_and_type_index: parse_u2(bytes, cursor) 
                     }
                 }
             }
@@ -517,8 +524,8 @@ mod java_stuff {
                 CpInfo {
                     tag,
                     info: ConstInfo::NameAndType { 
-                        name_index: parse_u2(bytes, cursor).unwrap(), 
-                        desc_index: parse_u2(bytes, cursor).unwrap()
+                        name_index: parse_u2(bytes, cursor), 
+                        desc_index: parse_u2(bytes, cursor)
                     }
                 }
             }
@@ -537,7 +544,7 @@ mod java_stuff {
                         name_index,
                         attr_len,
                         info: AttrInfo::ConstantValue { 
-                            constvalue_index: parse_u2(bytes, cursor).unwrap() 
+                            constvalue_index: parse_u2(bytes, cursor) 
                         }
                     }
                 )
@@ -549,7 +556,7 @@ mod java_stuff {
                         name_index, 
                         attr_len, 
                         info: AttrInfo::SourceFile { 
-                            sourcefile_index: parse_u2(bytes, cursor).unwrap()
+                            sourcefile_index: parse_u2(bytes, cursor)
                         }
                     }
                 )
@@ -563,7 +570,7 @@ mod java_stuff {
                         attr_len,
                         info: AttrInfo::LineNumberTable { 
                             line_number_len: {
-                                ln_num_len = parse_u2(bytes, cursor).unwrap();
+                                ln_num_len = parse_u2(bytes, cursor);
                                 ln_num_len
                             }, 
                             line_number_tbl: {
@@ -585,8 +592,8 @@ mod java_stuff {
                         name_index,
                         attr_len,
                         info: AttrInfo::Code { 
-                            max_stack: parse_u2(bytes, cursor).unwrap(), 
-                            max_locals: parse_u2(bytes, cursor).unwrap(), 
+                            max_stack: parse_u2(bytes, cursor), 
+                            max_locals: parse_u2(bytes, cursor), 
                             code_len: {
                                 code_length = parse_u4(bytes, cursor).unwrap();
                                 code_length
@@ -597,7 +604,7 @@ mod java_stuff {
                                 code_slice
                             }, 
                             exception_table_len: {
-                                exc_tbl_len = parse_u2(bytes, cursor).unwrap();
+                                exc_tbl_len = parse_u2(bytes, cursor);
                                 exc_tbl_len
                             }, 
                             exception_table: {
@@ -611,7 +618,7 @@ mod java_stuff {
                                     .collect()
                             }, 
                             attr_count: {
-                                code_attr_len = parse_u2(bytes, cursor).unwrap();
+                                code_attr_len = parse_u2(bytes, cursor);
                                 code_attr_len
                             }, 
                             attributes: parse_attributes(bytes, cursor, code_attr_len, constants)
@@ -730,7 +737,7 @@ mod java_stuff {
     fn parse_attributes(bytes: &Vec<u8>, cursor: &mut u32, attr_count: u16, const_pool: &Vec<CpInfo>) -> Vec<Attribute>{
         (0..attr_count)
             .map(|_| {
-                let name_index = parse_u2(bytes, cursor).unwrap();
+                let name_index = parse_u2(bytes, cursor);
                 parse_attribute(bytes, cursor, name_index, const_pool).expect("None attribute")
             }).collect()
     }
@@ -740,10 +747,10 @@ mod java_stuff {
             .map(|_| {
                 let attr_count: u16;
                 Member {
-                    access_flags: parse_u2(bytes, cursor).unwrap(),
-                    name_index: parse_u2(bytes, cursor).unwrap(),
-                    desc_index: parse_u2(bytes, cursor).unwrap(),
-                    attr_count: {attr_count = parse_u2(bytes, cursor).unwrap(); attr_count},
+                    access_flags: parse_u2(bytes, cursor),
+                    name_index: parse_u2(bytes, cursor),
+                    desc_index: parse_u2(bytes, cursor),
+                    attr_count: {attr_count = parse_u2(bytes, cursor); attr_count},
                     attributes: parse_attributes(bytes, cursor, attr_count, const_pool)
                 }
             }).collect()
@@ -795,21 +802,20 @@ mod java_stuff {
         let attr_count: u16;
         ClassFile {
             magic: parse_magic(&bytes, &mut cursor),
-            minor_version: parse_u2(&bytes, &mut cursor).unwrap(),
-            major_version: parse_u2(&bytes, &mut cursor).unwrap(),
-            const_pool_count: {const_pool_count = parse_u2(&bytes, &mut cursor).unwrap(); const_pool_count},
+            minor_version: parse_u2(&bytes, &mut cursor),
+            major_version: parse_u2(&bytes, &mut cursor),
+            const_pool_count: {const_pool_count = parse_u2(&bytes, &mut cursor); const_pool_count},
             const_pool: {const_pool = parse_constants(&bytes, &mut cursor, const_pool_count); const_pool.clone()},
-            access_flags: parse_u2(&bytes, &mut cursor).unwrap(),
-            this_class: parse_u2(&bytes, &mut cursor).unwrap(),
-            super_class: parse_u2(&bytes, &mut cursor).unwrap(),
-            interfaces_count: {interfaces_count = parse_u2(&bytes, &mut cursor).unwrap(); interfaces_count},
-            interfaces: {(0..=interfaces_count.saturating_sub(1))
-                            .map(|_| parse_u2(&bytes, &mut cursor).unwrap()).collect()},
-            fields_count: {fields_count = parse_u2(&bytes, &mut cursor).unwrap(); fields_count},
+            access_flags: parse_u2(&bytes, &mut cursor),
+            this_class: parse_u2(&bytes, &mut cursor),
+            super_class: parse_u2(&bytes, &mut cursor),
+            interfaces_count: {interfaces_count = parse_u2(&bytes, &mut cursor); interfaces_count},
+            interfaces: (0..interfaces_count).map(|_| parse_u2(&bytes, &mut cursor)).collect(),
+            fields_count: {fields_count = parse_u2(&bytes, &mut cursor); fields_count},
             fields: parse_members(&bytes, &mut cursor, fields_count, &const_pool),
-            methods_count: {methods_count = parse_u2(&bytes, &mut cursor).unwrap(); methods_count},
+            methods_count: {methods_count = parse_u2(&bytes, &mut cursor); methods_count},
             methods: parse_members(&bytes, &mut cursor, methods_count, &const_pool),
-            attr_count: {attr_count = parse_u2(&bytes, &mut cursor).unwrap(); attr_count},
+            attr_count: {attr_count = parse_u2(&bytes, &mut cursor); attr_count},
             attributes: parse_attributes(&bytes, &mut cursor, attr_count, &const_pool)
         }
 
