@@ -1,4 +1,3 @@
-#[allow(clippy::unused_variables)]
 mod java_stuff {
     use std::{fmt::Debug, fs, iter::zip, str::FromStr};
 
@@ -92,7 +91,6 @@ mod java_stuff {
     impl Num64 for f64 {}
 
     #[derive(Debug, Clone)]
-    #[allow(clippy::unused_variables)]
     enum ConstInfo {
         Class { name_index: u16 }, // Class_info, String_info
         Member { class_index: u16, name_and_type_index: u16 }, // Fieldref_info, Methodref_info, InterfaceMethodref_info
@@ -194,8 +192,6 @@ mod java_stuff {
         NULL
     }
 
-    
-
     impl crate::java_stuff::AttrInfo {
         pub fn get_code_bytes(&self) -> Option<Vec<u8>> {
             match self {
@@ -216,7 +212,6 @@ mod java_stuff {
     }
 
     #[derive(Debug, Clone)]
-    #[allow(clippy::unused_variables)]
     pub struct Member { // field_info and method_info merged
         access_flags: u16,
         name_index: u16,
@@ -240,7 +235,6 @@ mod java_stuff {
     //TODO: Move the structs into their own module
     // Maybe even move some of the helper methods there too?
     #[derive(Debug)]
-    #[allow(clippy::unused_variables)]
     pub struct ClassFile {
         magic: u32,
         minor_version: u16,
@@ -253,9 +247,9 @@ mod java_stuff {
         interfaces_count: u16,
         interfaces: Vec<u16>, // list of indexes into const_pool
         fields_count: u16,
-        pub fields: Vec<Member>,
+        fields: Vec<Member>,
         methods_count: u16,
-        pub methods: Vec<Member>,
+        methods: Vec<Member>,
         attr_count: u16,
         attributes: Vec<Attribute>
     }
@@ -281,7 +275,7 @@ mod java_stuff {
                 &self.get_utf8(member.name_index) + &params
             ).trim().replace('/', ".").to_string()
         }
-        pub fn get_member_desc(&self, member: &Member) -> String {
+        fn get_member_desc(&self, member: &Member) -> String {
             self.get_utf8(member.desc_index)
                 .replace('L', "")
                 .replace('/', ".")
@@ -293,8 +287,16 @@ mod java_stuff {
                 )
                 .to_string()
         }
+        
+        // Accessors
         pub fn get_constants(&self) -> Vec<CpInfo> {
             self.const_pool.clone()
+        }
+        pub fn get_methods(&self) -> Vec<Member> {
+            self.methods.clone()
+        }
+        pub fn get_fields(&self) -> Vec<Member> {
+            self.fields.clone()
         }
         pub fn get_classname(&self) -> String {
             get_classname(self.this_class as usize, &self.const_pool)
@@ -305,23 +307,26 @@ mod java_stuff {
         pub fn get_interfaces(&self) -> Vec<String> {
             self.interfaces.iter().map(|index: &u16| get_classname(*index as usize, &self.const_pool)).collect()
         }
-        pub fn get_fields(&self) -> Vec<String> {
-            self.get_member_names(&self.fields)
+        
+        pub fn get_field_names(&self) -> Vec<String> {
+            self.get_member_names(&self.get_fields())
         }
-        pub fn get_methods(&self) -> Vec<String> {
-            self.get_member_names(&self.methods)
+        pub fn get_method_names(&self) -> Vec<String> {
+            self.get_member_names(&self.get_methods())
         }
         pub fn get_fields_full(&self) -> Vec<String> {
-            self.fields.clone().iter()
+            self.get_fields().iter()
                 .map(|field| self.get_member_sig(field))
                 .map(|string| string + ";")
                 .collect()
         }
         pub fn get_methods_sig(&self) -> Vec<String> {
-            self.methods.clone().iter()
+            self.get_methods().iter()
                 .map(|method| self.get_member_sig(method))
                 .collect()
         }
+        
+        // TODO: Move to specialized decompilation file
         pub fn get_method_bytecode(&self, member: &Member) -> Vec<String> {
             decompile_code_bytes(&member.get_code())
         }  
@@ -837,7 +842,7 @@ fn main() {
     hello_class.get_fields_full().iter().for_each(|str| println!("\t{}", str));
     println!();
     
-    zip(hello_class.get_methods_sig(),hello_class.methods.clone())
+    zip(hello_class.get_methods_sig(),hello_class.get_methods())
         .map(|(sig,method)| 
             (sig,
             hello_class.get_method_bytecode(&method)
@@ -845,7 +850,7 @@ fn main() {
                 .map(|opcode: &String| "\t\t".to_string() + opcode)
                 .collect::<Vec<String>>()
                 .join(",\n")
-            ) //TODO: use reduce to handle join()?
+            )
         )
         .collect::<Vec<(String,String)>>()
         .iter()
